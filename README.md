@@ -19,16 +19,25 @@ A lightweight and user-friendly Python library for working with Google Drive acr
 ### From GitHub
 
 ```bash
-pip install git+https://github.com/yourusername/gdrive-toolkit.git
+pip install git+https://github.com/tieupham-ltp/gdrive-toolkit.git
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/yourusername/gdrive-toolkit.git
+git clone https://github.com/tieupham-ltp/gdrive-toolkit.git
 cd gdrive-toolkit
 pip install -e .
 ```
+
+## 📖 Documentation
+
+- 📘 [Quick Start Guide](GET_STARTED.md)
+- 🎯 [**Kaggle Usage Guide**](KAGGLE_GUIDE.md) - **Hướng dẫn sử dụng trên Kaggle**
+- 📚 [API Reference](docs/API_REFERENCE.md)
+- 💻 [CLI Guide](docs/CLI_GUIDE.md)
+- 🔑 [Credentials Setup](docs/CREDENTIALS_SETUP.md)
+- 📝 [Examples](examples/)
 
 ## 🚀 Quick Start
 
