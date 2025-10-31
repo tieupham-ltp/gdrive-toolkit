@@ -185,7 +185,8 @@ def authenticate_local(
 
 def quick_connect(
     credentials_file: str = "mycreds.txt",
-    client_secrets_file: str = "client_secrets.json"
+    client_secrets_file: str = "client_secrets.json",
+    force_env: Optional[str] = None
 ) -> GoogleDrive:
     """
     Quick connect to Google Drive with auto-detection of environment.
@@ -197,18 +198,36 @@ def quick_connect(
     Args:
         credentials_file: Path to credentials (local only, default: 'mycreds.txt')
         client_secrets_file: Path to client secrets (local only, default: 'client_secrets.json')
+        force_env: Force specific environment ('colab', 'kaggle', or 'local'). 
+                   If None, auto-detects. Use this if auto-detection fails.
     
     Returns:
         GoogleDrive: Authenticated Google Drive instance
         
-    Example:
-        >>> from gdrive_toolkit import quick_connect
+    Examples:
+        >>> # Auto-detect environment
         >>> drive = quick_connect()
-        >>> # Now use drive for operations
+        
+        >>> # Force Kaggle authentication (if auto-detect fails)
+        >>> drive = quick_connect(force_env='kaggle')
+        
+        >>> # Force Colab authentication
+        >>> drive = quick_connect(force_env='colab')
+        
+        >>> # Force local authentication
+        >>> drive = quick_connect(force_env='local')
     """
-    env = detect_environment()
-    
-    print(f"🔍 Detected environment: {env.upper()}")
+    if force_env:
+        env = force_env.lower()
+        if env not in ['colab', 'kaggle', 'local']:
+            raise ValueError(
+                f"Invalid force_env: '{force_env}'. "
+                "Must be 'colab', 'kaggle', or 'local'"
+            )
+        print(f"🎯 Forced environment: {env.upper()}")
+    else:
+        env = detect_environment()
+        print(f"🔍 Detected environment: {env.upper()}")
     
     if env == 'colab':
         return authenticate_colab()

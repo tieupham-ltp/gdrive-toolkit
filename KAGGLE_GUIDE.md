@@ -29,6 +29,10 @@ from gdrive_toolkit import quick_connect
 
 # Kết nối tự động (tự phát hiện môi trường Kaggle)
 drive = quick_connect()
+
+# ⚠️ NẾU AUTO-DETECT BỊ SAI (nhận diện là Colab thay vì Kaggle):
+# Dùng option force_env để chỉ định rõ môi trường
+drive = quick_connect(force_env='kaggle')
 ```
 
 ---
@@ -391,6 +395,23 @@ print("✓ All results saved to Google Drive!")
 
 ## 🆘 Xử Lý Lỗi Thường Gặp
 
+### Lỗi: "Detected environment: COLAB" trên Kaggle ⚠️
+
+**Triệu chứng:** Khi chạy `quick_connect()` trên Kaggle nhưng hiện "Detected environment: COLAB"
+
+**Nguyên nhân:** Một số Kaggle notebook có package `google.colab` được cài sẵn, gây nhầm lẫn trong auto-detection
+
+**Giải pháp:**
+```python
+# Option 1: Force environment (Khuyến nghị)
+from gdrive_toolkit import quick_connect
+drive = quick_connect(force_env='kaggle')
+
+# Option 2: Gọi trực tiếp hàm authenticate_kaggle
+from gdrive_toolkit.auth import authenticate_kaggle
+drive = authenticate_kaggle()
+```
+
 ### Lỗi: "Secrets not found"
 ```python
 # Kiểm tra secrets có được enable không
@@ -405,6 +426,15 @@ print("GDRIVE_CLIENT_SECRET:", os.getenv('GDRIVE_CLIENT_SECRET') is not None)
 1. Kiểm tra client_id và client_secret có đúng không
 2. Đảm bảo đã Enable Google Drive API
 3. Thử xóa file `/kaggle/working/credentials.json` và authenticate lại
+
+### Lỗi: Version cũ không update
+```python
+# Cài lại với force reinstall và no cache
+!pip uninstall -y gdrive-toolkit
+!pip install --no-cache-dir --force-reinstall git+https://github.com/tieupham-ltp/gdrive-toolkit.git
+
+# Sau đó restart kernel: Session > Restart Session
+```
 
 ### Lỗi: "Quota exceeded"
 ➡️ **Giải pháp**: 

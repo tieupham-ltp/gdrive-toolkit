@@ -50,6 +50,9 @@ from gdrive_toolkit import quick_connect
 
 # Automatically detects Colab, Kaggle, or local environment
 drive = quick_connect()
+
+# Or force specific environment if auto-detection fails
+drive = quick_connect(force_env='kaggle')  # 'colab', 'kaggle', or 'local'
 ```
 
 ### 2. Upload Files
