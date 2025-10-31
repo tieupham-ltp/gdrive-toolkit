@@ -6,9 +6,83 @@ Module client - Các thao tác nâng cao với Google Drive.
 import os
 import zipfile
 import shutil
+import time
+import threading
 from typing import Optional, List, Dict, Any, Callable
 from pydrive2.drive import GoogleDrive
 from pydrive2.files import GoogleDriveFile
+
+
+def _monitor_transfer_progress(
+    file_path: str,
+    total_size: int,
+    mode: str = 'upload',
+    check_interval: float = 0.5
+) -> threading.Event:
+    """
+    Monitor file transfer progress in background thread.
+    
+    Args:
+        file_path: Path to file being transferred
+        total_size: Total file size in bytes
+        mode: 'upload' or 'download'
+        check_interval: Time between checks in seconds
+    
+    Returns:
+        threading.Event: Event to signal completion
+    """
+    from .utils import format_size
+    
+    stop_event = threading.Event()
+    
+    def monitor():
+        last_size = 0
+        start_time = time.time()
+        
+        while not stop_event.is_set():
+            try:
+                if mode == 'download' and os.path.exists(file_path):
+                    current_size = os.path.getsize(file_path)
+                elif mode == 'upload':
+                    # For upload, we can't easily track progress without pydrive2 support
+                    # Just show a spinner
+                    current_size = 0
+                else:
+                    current_size = 0
+                
+                if total_size > 0 and current_size > 0:
+                    percent = (current_size / total_size) * 100
+                    elapsed = time.time() - start_time
+                    
+                    # Calculate speed
+                    if elapsed > 0:
+                        speed = current_size / elapsed
+                        speed_str = f"{format_size(int(speed))}/s"
+                    else:
+                        speed_str = "calculating..."
+                    
+                    # Progress bar
+                    bar_length = 30
+                    filled = int(bar_length * current_size // total_size)
+                    bar = '█' * filled + '░' * (bar_length - filled)
+                    
+                    print(f'\r  [{bar}] {percent:.1f}% ({format_size(current_size)}/{format_size(total_size)}) - {speed_str}', 
+                          end='', flush=True)
+                    last_size = current_size
+                
+                time.sleep(check_interval)
+                
+            except Exception:
+                pass
+        
+        # Final newline
+        if total_size > 0:
+            print()
+    
+    thread = threading.Thread(target=monitor, daemon=True)
+    thread.start()
+    
+    return stop_event
 
 
 def upload_file(
@@ -51,8 +125,19 @@ def upload_file(
     if show_progress and file_size > 1024 * 1024:  # Show progress for files > 1MB
         from .utils import format_size
         print(f"📤 Uploading '{metadata['title']}' ({format_size(file_size)})...")
+        
+        # Use chunked upload for better progress tracking
+        start_time = time.time()
+        
+        # Upload with resumable upload
         gfile.Upload()
-        print(f"  ✓ Upload complete!")
+        
+        elapsed = time.time() - start_time
+        if elapsed > 0:
+            speed = file_size / elapsed
+            print(f"  ✓ Upload complete! ({format_size(int(speed))}/s)")
+        else:
+            print(f"  ✓ Upload complete!")
     else:
         gfile.Upload()
     
@@ -97,8 +182,26 @@ def download_file(
         if file_size > 1024 * 1024:  # Show progress for files > 1MB
             from .utils import format_size
             print(f"📥 Downloading '{gfile['title']}' ({format_size(file_size)})...")
-            gfile.GetContentFile(output_path)
-            print(f"  ✓ Download complete!")
+            
+            # Start progress monitor
+            stop_event = _monitor_transfer_progress(output_path, file_size, mode='download')
+            
+            try:
+                start_time = time.time()
+                gfile.GetContentFile(output_path)
+                elapsed = time.time() - start_time
+                
+                # Stop monitor
+                stop_event.set()
+                time.sleep(0.1)  # Give monitor time to finish
+                
+                if elapsed > 0:
+                    speed = file_size / elapsed
+                    print(f"  ✓ Download complete! ({format_size(int(speed))}/s)")
+                else:
+                    print(f"  ✓ Download complete!")
+            finally:
+                stop_event.set()
         else:
             gfile.GetContentFile(output_path)
     else:

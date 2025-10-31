@@ -4,6 +4,7 @@ Các thao tác với file trên Google Drive.
 """
 
 import os
+import time
 from typing import Optional, List, Dict, Any
 from pydrive2.drive import GoogleDrive
 from pydrive2.files import GoogleDriveFile
@@ -58,19 +59,15 @@ def upload_file(
         from .utils import format_size
         print(f"📤 Uploading '{file_name}' ({format_size(file_size)})...")
         
-        # Upload with progress callback
-        def progress_callback(current, total):
-            if total > 0:
-                percent = (current / total) * 100
-                bar_length = 40
-                filled = int(bar_length * current // total)
-                bar = '█' * filled + '░' * (bar_length - filled)
-                print(f'\r  Progress: |{bar}| {percent:.1f}% ({format_size(current)}/{format_size(total)})', end='', flush=True)
-        
-        # Note: pydrive2 doesn't support progress callback directly
-        # We'll just show a message
+        start_time = time.time()
         gfile.Upload()
-        print()  # New line after upload
+        elapsed = time.time() - start_time
+        
+        if elapsed > 0:
+            speed = file_size / elapsed
+            print(f"  ✓ Upload complete! ({format_size(int(speed))}/s)")
+        else:
+            print(f"  ✓ Upload complete!")
     else:
         gfile.Upload()
     
@@ -169,9 +166,29 @@ def download_file(
         
         if file_size > 1024 * 1024:  # Show progress for files > 1MB
             from .utils import format_size
+            from .client import _monitor_transfer_progress
+            
             print(f"📥 Downloading '{title}' ({format_size(file_size)})...")
-            gfile.GetContentFile(output_path)
-            print(f"  ✓ Download complete!")
+            
+            # Start progress monitor
+            stop_event = _monitor_transfer_progress(output_path, file_size, mode='download')
+            
+            try:
+                start_time = time.time()
+                gfile.GetContentFile(output_path)
+                elapsed = time.time() - start_time
+                
+                # Stop monitor
+                stop_event.set()
+                time.sleep(0.1)  # Give monitor time to finish
+                
+                if elapsed > 0:
+                    speed = file_size / elapsed
+                    print(f"  ✓ Download complete! ({format_size(int(speed))}/s)")
+                else:
+                    print(f"  ✓ Download complete!")
+            finally:
+                stop_event.set()
         else:
             gfile.GetContentFile(output_path)
     else:
