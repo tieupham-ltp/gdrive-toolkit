@@ -142,3 +142,9 @@ Thumbs.db
 # Testing
 tests/test_files/
 downloads/
+
+# Sensitive credentials (DO NOT COMMIT!)
+kaggle_secrets.txt
+credentials_temp.json
+mycreds.txt
+client_secrets.json
