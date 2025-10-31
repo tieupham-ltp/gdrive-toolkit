@@ -39,7 +39,9 @@ drive = quick_connect(force_env='kaggle')
 
 ## 🔑 Thiết Lập Credentials
 
-### Cách 1: Sử dụng Kaggle Secrets (Khuyến nghị ⭐)
+⚠️ **Lưu ý quan trọng:** Kaggle notebooks không hỗ trợ authentication interactive (nhập code trực tiếp). Bạn cần setup credentials trước bằng 1 trong 2 cách sau:
+
+### Cách 1: Dùng Refresh Token (Khuyến nghị ⭐)
 
 #### Bước 1: Tạo OAuth 2.0 Credentials trên Google Cloud
 
@@ -56,79 +58,114 @@ drive = quick_connect(force_env='kaggle')
    - Đặt tên: "Kaggle Drive Access"
    - Click "Create"
 
-5. Download file JSON credentials
+5. Download file JSON credentials (`client_secrets.json`)
 
-#### Bước 2: Thêm vào Kaggle Secrets
+#### Bước 2: Tạo Refresh Token (Trên Máy Local)
 
-1. Mở file `client_secrets.json` vừa download
-2. Truy cập [Kaggle Settings](https://www.kaggle.com/settings)
-3. Vào tab **Secrets** (hoặc Add-ons > Secrets)
-4. Click "Add a new secret"
-5. Thêm **2 secrets** sau:
+**Chạy script trên máy local để lấy refresh token:**
 
-**Secret 1: GDRIVE_CLIENT_ID**
+```bash
+# Clone repo
+git clone https://github.com/tieupham-ltp/gdrive-toolkit.git
+cd gdrive-toolkit
+
+# Cài pydrive2
+pip install pydrive2
+
+# Chạy script (client_secrets.json phải ở cùng folder)
+python get_refresh_token.py
+```
+
+Script sẽ:
+1. Mở browser để bạn đăng nhập Google
+2. Sau khi authorize, hiển thị 3 giá trị:
+   - `GDRIVE_CLIENT_ID`
+   - `GDRIVE_CLIENT_SECRET`
+   - `GDRIVE_REFRESH_TOKEN` ⭐
+3. Lưu vào file `kaggle_secrets.txt`
+
+💡 **Mẹo:** Nếu không có máy local, có thể chạy script này trên Google Colab!
+
+#### Bước 3: Thêm vào Kaggle Secrets
+
+1. Truy cập [Kaggle Settings > Secrets](https://www.kaggle.com/settings)
+2. Click "Add a new secret"
+3. Thêm **3 secrets** (copy từ output script):
+
 ```
 Name: GDRIVE_CLIENT_ID
-Value: [Copy giá trị "client_id" từ trong client_secrets.json -> installed -> client_id]
-```
+Value: [Paste client_id từ script output]
 
-**Secret 2: GDRIVE_CLIENT_SECRET**
-```
 Name: GDRIVE_CLIENT_SECRET
-Value: [Copy giá trị "client_secret" từ trong client_secrets.json -> installed -> client_secret]
+Value: [Paste client_secret từ script output]
+
+Name: GDRIVE_REFRESH_TOKEN
+Value: [Paste refresh_token từ script output]
 ```
 
-💡 **Mở file JSON và tìm:**
-```json
-{
-  "installed": {
-    "client_id": "xxxxx.apps.googleusercontent.com",  ← Copy cái này
-    "client_secret": "xxxxx-xxxxxx",  ← Copy cái này
-    ...
-  }
-}
-```
+#### Bước 4: Enable Secrets trong Notebook
 
-#### Bước 3: Enable Secrets trong Notebook
-
-1. Mở Kaggle Notebook của bạn
-2. Click vào **Settings** (biểu tượng bánh răng ở góc phải)
-3. Trong phần **Secrets**, bật (toggle ON) cả 2:
+1. Mở Kaggle Notebook
+2. Click **Settings** (⚙️ góc phải)
+3. Trong **Secrets**, toggle ON cả 3:
    - ✅ GDRIVE_CLIENT_ID
    - ✅ GDRIVE_CLIENT_SECRET
+   - ✅ GDRIVE_REFRESH_TOKEN
 
-#### Bước 4: Xác Thực Lần Đầu
+#### Bước 5: Sử Dụng
 
 ```python
 from gdrive_toolkit import quick_connect
 
-# Kết nối (lần đầu cần xác thực qua browser)
+# Kết nối (tự động dùng refresh token từ Kaggle Secrets)
+drive = quick_connect(force_env='kaggle')
+
+# Upload file
+from gdrive_toolkit import upload_file
+upload_file(drive, '/kaggle/working/result.csv')
+```
+
+✅ **Xong!** Không cần authenticate lại, tự động hoạt động mỗi lần chạy!
+
+---
+
+### Cách 2: Upload Credentials File
+
+Nếu bạn đã có file credentials từ máy local:
+
+**Bước 1: Tạo credentials trên local**
+```python
+# Chạy trên máy local
+from gdrive_toolkit import quick_connect
+drive = quick_connect()  # Sẽ tạo file mycreds.txt
+```
+
+**Bước 2: Upload lên Kaggle**
+1. Tạo dataset Kaggle chứa file `mycreds.txt`
+2. Add dataset vào notebook
+
+**Bước 3: Copy file trong notebook**
+```python
+# Copy credentials file
+!cp /kaggle/input/your-dataset/mycreds.txt /kaggle/working/gdrive_credentials.json
+
+# Sau đó connect (chỉ cần CLIENT_ID và CLIENT_SECRET secrets)
+from gdrive_toolkit import quick_connect
 drive = quick_connect(force_env='kaggle')
 ```
 
-**Lần chạy đầu tiên:**
-1. Sẽ hiện link authorization
-2. Copy link, mở trong tab mới
-3. Đăng nhập Google và cho phép truy cập
-4. Copy code authorization về và paste vào notebook
-5. Credentials sẽ được lưu tại `/kaggle/working/gdrive_credentials.json`
+---
 
-**Các lần sau:**
-- Tự động dùng credentials đã lưu
-- Không cần xác thực lại (trừ khi credentials hết hạn)
+### So Sánh 2 Cách:
 
-### Cách 2: Không Dùng Secrets (Manual)
+| | Cách 1: Refresh Token | Cách 2: Upload File |
+|---|---|---|
+| **Setup** | 1 lần trên local | Mỗi lần notebook mới |
+| **Secrets cần** | 3 (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN) | 2 + file upload |
+| **Tiện lợi** | ⭐⭐⭐⭐⭐ Auto | ⭐⭐⭐ Phải copy file |
+| **Bảo mật** | ⭐⭐⭐⭐⭐ Token trong Secrets | ⭐⭐⭐ File public nếu dataset public |
 
-Nếu không muốn dùng Kaggle Secrets, có thể hardcode (không khuyến nghị):
-
-```python
-from gdrive_toolkit.auth import authenticate_kaggle
-
-drive = authenticate_kaggle(
-    client_id='your_client_id_here',
-    client_secret='your_client_secret_here'
-)
-```
+**→ Khuyến nghị: Dùng Cách 1 (Refresh Token)**
 
 ```python
 from gdrive_toolkit.auth import authenticate_kaggle
