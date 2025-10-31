@@ -56,92 +56,78 @@ drive = quick_connect(force_env='kaggle')
    - Đặt tên: "Kaggle Drive Access"
    - Click "Create"
 
-5. Download file JSON credentials (lưu với tên `client_secrets.json`)
+5. Download file JSON credentials
 
-#### Bước 2: Tạo Refresh Token
+#### Bước 2: Thêm vào Kaggle Secrets
 
-**Trên máy local (chỉ làm 1 lần):**
-
-```bash
-# Clone repo (hoặc download file get_refresh_token.py)
-git clone https://github.com/tieupham-ltp/gdrive-toolkit.git
-cd gdrive-toolkit
-
-# Đảm bảo đã cài pydrive2
-pip install pydrive2
-
-# Chạy script (client_secrets.json phải cùng thư mục)
-python get_refresh_token.py
-```
-
-Script sẽ:
-1. Mở browser để bạn đăng nhập Google
-2. Sau khi authorize, nó sẽ hiển thị 3 giá trị cần thiết:
-   - `GDRIVE_CLIENT_ID`
-   - `GDRIVE_CLIENT_SECRET`
-   - `GDRIVE_REFRESH_TOKEN`
-3. Lưu vào file `kaggle_secrets.txt` để tiện copy
-
-**⚠️ Lưu ý quan trọng về Refresh Token:**
-- Refresh token chỉ được tạo **LẦN ĐẦU TIÊN** bạn authorize app
-- Nếu không nhận được refresh token, hãy:
-  1. Vào https://myaccount.google.com/permissions
-  2. Revoke (thu hồi) quyền của app
-  3. Xóa file `credentials_temp.json` (nếu có)
-  4. Chạy lại `get_refresh_token.py`
-
-#### Bước 3: Thêm vào Kaggle Secrets
-
-1. Truy cập [Kaggle Settings](https://www.kaggle.com/settings)
-2. Vào tab **Secrets** (hoặc Add-ons > Secrets)
-3. Click "Add a new secret"
-4. Thêm **3 secrets** sau (copy từ output của script):
+1. Mở file `client_secrets.json` vừa download
+2. Truy cập [Kaggle Settings](https://www.kaggle.com/settings)
+3. Vào tab **Secrets** (hoặc Add-ons > Secrets)
+4. Click "Add a new secret"
+5. Thêm **2 secrets** sau:
 
 **Secret 1: GDRIVE_CLIENT_ID**
 ```
 Name: GDRIVE_CLIENT_ID
-Value: [Copy từ client_secrets.json hoặc output script]
+Value: [Copy giá trị "client_id" từ trong client_secrets.json -> installed -> client_id]
 ```
 
 **Secret 2: GDRIVE_CLIENT_SECRET**
 ```
 Name: GDRIVE_CLIENT_SECRET
-Value: [Copy từ client_secrets.json hoặc output script]
+Value: [Copy giá trị "client_secret" từ trong client_secrets.json -> installed -> client_secret]
 ```
 
-**Secret 3: GDRIVE_REFRESH_TOKEN** ⭐
-```
-Name: GDRIVE_REFRESH_TOKEN
-Value: [Copy từ output của get_refresh_token.py]
+💡 **Mở file JSON và tìm:**
+```json
+{
+  "installed": {
+    "client_id": "xxxxx.apps.googleusercontent.com",  ← Copy cái này
+    "client_secret": "xxxxx-xxxxxx",  ← Copy cái này
+    ...
+  }
+}
 ```
 
-#### Bước 4: Enable Secrets trong Notebook
+#### Bước 3: Enable Secrets trong Notebook
 
 1. Mở Kaggle Notebook của bạn
 2. Click vào **Settings** (biểu tượng bánh răng ở góc phải)
-3. Trong phần **Secrets**, bật (toggle ON) cả 3:
+3. Trong phần **Secrets**, bật (toggle ON) cả 2:
    - ✅ GDRIVE_CLIENT_ID
    - ✅ GDRIVE_CLIENT_SECRET
-   - ✅ GDRIVE_REFRESH_TOKEN
 
-#### Bước 5: Sử dụng trong Code
+#### Bước 4: Xác Thực Lần Đầu
 
 ```python
 from gdrive_toolkit import quick_connect
 
-# Kết nối tự động - sẽ tự lấy credentials từ Kaggle Secrets
+# Kết nối (lần đầu cần xác thực qua browser)
 drive = quick_connect(force_env='kaggle')
 ```
 
-### Cách 2: Không Dùng Secrets (Không khuyến nghị)
+**Lần chạy đầu tiên:**
+1. Sẽ hiện link authorization
+2. Copy link, mở trong tab mới
+3. Đăng nhập Google và cho phép truy cập
+4. Copy code authorization về và paste vào notebook
+5. Credentials sẽ được lưu tại `/kaggle/working/gdrive_credentials.json`
 
-⚠️ Cách này ít bảo mật hơn, chỉ dùng cho testing:
+**Các lần sau:**
+- Tự động dùng credentials đã lưu
+- Không cần xác thực lại (trừ khi credentials hết hạn)
+
+### Cách 2: Không Dùng Secrets (Manual)
+
+Nếu không muốn dùng Kaggle Secrets, có thể hardcode (không khuyến nghị):
 
 ```python
 from gdrive_toolkit.auth import authenticate_kaggle
 
-# Hardcode credentials (không an toàn!)
-# drive = authenticate_kaggle()  # Sẽ lỗi vì không có secrets
+drive = authenticate_kaggle(
+    client_id='your_client_id_here',
+    client_secret='your_client_secret_here'
+)
 ```
 
 ```python

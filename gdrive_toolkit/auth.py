@@ -62,52 +62,92 @@ def authenticate_colab() -> GoogleDrive:
     return drive
 
 
-def authenticate_kaggle() -> GoogleDrive:
+def authenticate_kaggle(
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None
+) -> GoogleDrive:
     """
     Authenticate Google Drive in Kaggle environment.
     Xác thực trong môi trường Kaggle.
+    
+    Args:
+        client_id: Google OAuth client ID (optional, reads from secrets if not provided)
+        client_secret: Google OAuth client secret (optional, reads from secrets if not provided)
     
     Returns:
         GoogleDrive: Authenticated Google Drive instance
         
     Note:
-        Requires Kaggle secrets: GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN
+        Requires Kaggle secrets: GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET
+        OR provide client_id and client_secret as arguments
+        
+    Example:
+        >>> # Option 1: Use Kaggle Secrets
+        >>> drive = authenticate_kaggle()
+        
+        >>> # Option 2: Provide credentials manually
+        >>> drive = authenticate_kaggle(
+        ...     client_id='your_client_id',
+        ...     client_secret='your_client_secret'
+        ... )
     """
-    try:
-        from kaggle_secrets import UserSecretsClient  # type: ignore
-    except ImportError:
-        raise ImportError(
-            "This function requires kaggle_secrets. "
-            "Please run in Kaggle environment."
-        )
+    # Try to get from arguments first, then from Kaggle secrets
+    if client_id is None or client_secret is None:
+        try:
+            from kaggle_secrets import UserSecretsClient  # type: ignore
+            user_secrets = UserSecretsClient()
+            
+            if client_id is None:
+                client_id = user_secrets.get_secret("GDRIVE_CLIENT_ID")
+            if client_secret is None:
+                client_secret = user_secrets.get_secret("GDRIVE_CLIENT_SECRET")
+                
+        except ImportError:
+            raise ImportError(
+                "This function requires kaggle_secrets or explicit client_id/client_secret. "
+                "Please run in Kaggle environment or provide credentials."
+            )
+        except Exception as e:
+            raise ValueError(
+                "Missing Kaggle secrets. Please add to Kaggle Secrets: "
+                "GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET. "
+                f"Error: {e}"
+            )
     
-    # Get secrets from Kaggle
-    user_secrets = UserSecretsClient()
-    
-    try:
-        client_id = user_secrets.get_secret("GDRIVE_CLIENT_ID")
-        client_secret = user_secrets.get_secret("GDRIVE_CLIENT_SECRET")
-        refresh_token = user_secrets.get_secret("GDRIVE_REFRESH_TOKEN")
-    except Exception as e:
-        raise ValueError(
-            "Missing Kaggle secrets. Please add: "
-            "GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN. "
-            f"Error: {e}"
-        )
-    
-    # Create settings for PyDrive
+    # Create settings for PyDrive with CommandLineAuth
     settings = {
         "client_config_backend": "settings",
         "client_config": {
             "client_id": client_id,
-            "client_secret": client_secret
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost", "urn:ietf:wg:oauth:2.0:oob"]
         },
-        "save_credentials": False,
+        "save_credentials": True,
+        "save_credentials_backend": "file",
+        "save_credentials_file": "/kaggle/working/gdrive_credentials.json",
+        "get_refresh_token": True,
         "oauth_scope": ["https://www.googleapis.com/auth/drive"]
     }
     
     gauth = GoogleAuth(settings=settings)
-    gauth.credentials = gauth.flow.step2_exchange(refresh_token)
+    
+    # Try to load saved credentials
+    gauth.LoadCredentialsFile("/kaggle/working/gdrive_credentials.json")
+    
+    if gauth.credentials is None:
+        # First time - need manual authentication
+        print("=" * 70)
+        print("🔐 First-time authentication required")
+        print("=" * 70)
+        gauth.CommandLineAuth()
+    elif gauth.access_token_expired:
+        # Refresh if expired
+        gauth.Refresh()
+    else:
+        # Use existing valid credentials
+        gauth.Authorize()
     
     drive = GoogleDrive(gauth)
     print("✓ Successfully authenticated in Kaggle")
