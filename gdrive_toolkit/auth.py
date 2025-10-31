@@ -18,16 +18,17 @@ def detect_environment() -> str:
     Returns:
         str: 'colab', 'kaggle', or 'local'
     """
+    # Check for Kaggle FIRST (priority over Colab)
+    # Kaggle có thể có google.colab installed nên phải check trước
+    if os.path.exists('/kaggle/working'):
+        return 'kaggle'
+    
     # Check for Google Colab
     try:
         import google.colab  # type: ignore # noqa: F401
         return 'colab'
     except ImportError:
         pass
-    
-    # Check for Kaggle
-    if os.path.exists('/kaggle/working'):
-        return 'kaggle'
     
     # Default to local
     return 'local'
