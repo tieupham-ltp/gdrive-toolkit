@@ -188,15 +188,18 @@ drive = authenticate_kaggle(
 ```python
 from gdrive_toolkit import quick_connect, upload_file
 
-drive = quick_connect()
+drive = quick_connect(force_env='kaggle')
 
-# Upload 1 file
+# Upload 1 file - Lưu ý: dùng 'file_path' không phải 'local_path'
 file_id = upload_file(
     drive, 
-    local_path='/kaggle/input/dataset/data.csv',
+    file_path='/kaggle/input/dataset/data.csv',  # ✅ Đúng
     file_name='my_data.csv',
     folder_id=None  # None = upload vào root
 )
+
+print(f"File uploaded with ID: {file_id}")
+```
 
 print(f"File uploaded with ID: {file_id}")
 ```
@@ -230,24 +233,25 @@ folder_id = create_folder_path(drive, "Kaggle/Datasets/2025")
 # Upload vào folder đó
 upload_file(
     drive,
-    local_path='/kaggle/working/result.csv',
+    file_path='/kaggle/working/result.csv',  # ✅ Đúng: file_path
     folder_id=folder_id
 )
 ```
 
-### 4️⃣ Upload ZIP
+### 4️⃣ Zip và Upload Folder
 
 ```python
-from gdrive_toolkit.client import GDriveClient
+from gdrive_toolkit import zip_and_upload
 
-client = GDriveClient(drive)
-
-# Zip và upload toàn bộ folder
-file_id = client.zip_and_upload(
+# Zip toàn bộ folder và upload lên Google Drive
+file_id = zip_and_upload(
+    drive,
     folder_path='/kaggle/working/output',
     zip_name='kaggle_results.zip',
-    parent_id=None
+    parent_id=None  # None = upload vào root
 )
+
+print(f"Zipped and uploaded! File ID: {file_id}")
 ```
 
 ---
@@ -257,8 +261,7 @@ file_id = client.zip_and_upload(
 ### Ví dụ 1: Save Model vào Google Drive
 
 ```python
-from gdrive_toolkit import quick_connect, create_folder_path
-from gdrive_toolkit.client import GDriveClient
+from gdrive_toolkit import quick_connect, create_folder_path, upload_file
 import joblib
 
 # 1. Train model
@@ -270,17 +273,17 @@ model = RandomForestClassifier()
 joblib.dump(model, '/kaggle/working/model.pkl')
 
 # 3. Upload lên Google Drive
-drive = quick_connect()
-client = GDriveClient(drive)
+drive = quick_connect(force_env='kaggle')
 
 # Tạo folder cho project
 folder_id = create_folder_path(drive, "Kaggle/Models/RandomForest")
 
 # Upload model
-model_id = client.upload_file(
-    local_path='/kaggle/working/model.pkl',
+model_id = upload_file(
+    drive,
+    file_path='/kaggle/working/model.pkl',  # ✅ Đúng: file_path
     file_name=f'model_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.pkl',
-    parent_id=folder_id
+    folder_id=folder_id
 )
 
 print(f"✓ Model saved to Google Drive: {model_id}")
@@ -293,7 +296,7 @@ from gdrive_toolkit import quick_connect, search_files, download_file
 import pandas as pd
 
 # Kết nối
-drive = quick_connect()
+drive = quick_connect(force_env='kaggle')
 
 # Tìm dataset trên Drive
 files = search_files(drive, query="name = 'train_data.csv'")
@@ -316,12 +319,10 @@ else:
 ### Ví dụ 3: Backup Kết Quả Competition
 
 ```python
-from gdrive_toolkit import quick_connect, create_folder_path
-from gdrive_toolkit.client import GDriveClient
+from gdrive_toolkit import quick_connect, create_folder_path, upload_file
 from datetime import datetime
 
-drive = quick_connect()
-client = GDriveClient(drive)
+drive = quick_connect(force_env='kaggle')
 
 # Tạo folder theo competition
 competition_name = "titanic"
@@ -329,17 +330,19 @@ folder_path = f"Kaggle/Competitions/{competition_name}"
 folder_id = create_folder_path(drive, folder_path)
 
 # Upload submission file
-submission_id = client.upload_file(
-    local_path='/kaggle/working/submission.csv',
+submission_id = upload_file(
+    drive,
+    file_path='/kaggle/working/submission.csv',  # ✅ Đúng: file_path
     file_name=f'submission_{datetime.now():%Y%m%d_%H%M%S}.csv',
-    parent_id=folder_id
+    folder_id=folder_id
 )
 
 # Upload notebook (nếu có export)
-notebook_id = client.upload_file(
-    local_path='/kaggle/working/notebook.ipynb',
+notebook_id = upload_file(
+    drive,
+    file_path='/kaggle/working/notebook.ipynb',  # ✅ Đúng: file_path
     file_name=f'notebook_{datetime.now():%Y%m%d_%H%M%S}.ipynb',
-    parent_id=folder_id
+    folder_id=folder_id
 )
 
 print("✓ Backup completed!")
@@ -350,10 +353,10 @@ print(f"  - Notebook: {notebook_id}")
 ### Ví dụ 4: Upload Nhiều Files Cùng Lúc
 
 ```python
-from gdrive_toolkit.utils import batch_upload
+from gdrive_toolkit import batch_upload, quick_connect
 import glob
 
-drive = quick_connect()
+drive = quick_connect(force_env='kaggle')
 
 # Tìm tất cả file CSV trong working directory
 csv_files = glob.glob('/kaggle/working/*.csv')
@@ -369,11 +372,13 @@ file_ids = batch_upload(
 print(f"✓ Uploaded {len(file_ids)} files")
 ```
 
-### Ví dụ 5: Sync Output Folder
+### Ví dụ 5: Zip và Upload Output Folder
 
 ```python
-from gdrive_toolkit import quick_connect, create_folder_path
-from gdrive_toolkit.client import GDriveClient
+from gdrive_toolkit import quick_connect, create_folder_path, zip_and_upload
+import pandas as pd
+
+drive = quick_connect(force_env='kaggle')
 
 drive = quick_connect()
 client = GDriveClient(drive)
@@ -401,12 +406,10 @@ print(f"✓ All output synced to Google Drive: {zip_id}")
 
 # Cell 2: Import
 import pandas as pd
-from gdrive_toolkit import quick_connect, create_folder_path
-from gdrive_toolkit.client import GDriveClient
+from gdrive_toolkit import quick_connect, create_folder_path, upload_file, zip_and_upload
 
 # Cell 3: Kết nối Google Drive
-drive = quick_connect()
-client = GDriveClient(drive)
+drive = quick_connect(force_env='kaggle')
 
 # Cell 4: Setup folders
 project_folder = create_folder_path(drive, "Kaggle/MyProject")
@@ -417,9 +420,18 @@ print(f"Project folder ID: {project_folder}")
 
 # Cell 6: Save results to Google Drive
 # Upload predictions
-client.upload_file(
-    local_path='/kaggle/working/predictions.csv',
+upload_file(
+    drive,
+    file_path='/kaggle/working/predictions.csv',  # ✅ Đúng: file_path
     file_name='predictions.csv',
+    folder_id=project_folder
+)
+
+# Backup all outputs
+zip_and_upload(
+    drive,
+    folder_path='/kaggle/working',
+    zip_name='kaggle_outputs.zip',
     parent_id=project_folder
 )
 
