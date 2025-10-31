@@ -51,7 +51,28 @@ def upload_file(
     gfile.Upload()
     
     file_id = gfile['id']
-    print(f"✓ Uploaded '{file_name}' (ID: {file_id})")
+    
+    # Get file info to show location
+    gfile.FetchMetadata()
+    
+    # Build Google Drive URL
+    web_url = f"https://drive.google.com/file/d/{file_id}/view"
+    
+    # Show upload info
+    print(f"✓ Uploaded '{file_name}'")
+    print(f"  File ID: {file_id}")
+    print(f"  View URL: {web_url}")
+    
+    # Show folder location
+    if 'parents' in gfile and len(gfile['parents']) > 0:
+        parent_id = gfile['parents'][0]['id']
+        if parent_id == 'root' or not parent_id:
+            print(f"  Location: My Drive (Root)")
+        else:
+            print(f"  Location: Folder ID {parent_id}")
+            print(f"  Folder URL: https://drive.google.com/drive/folders/{parent_id}")
+    else:
+        print(f"  Location: My Drive (Root)")
     
     return file_id
 
@@ -265,7 +286,8 @@ def delete_file(
 
 def get_file_info(
     drive: GoogleDrive,
-    file_id: str
+    file_id: str,
+    show_path: bool = True
 ) -> Dict[str, Any]:
     """
     Get detailed information about a file.
@@ -274,18 +296,91 @@ def get_file_info(
     Args:
         drive: Authenticated GoogleDrive instance
         file_id: ID of the file
+        show_path: Whether to print the full path (default: True)
     
     Returns:
-        Dict: File metadata
+        Dict: File metadata including path information
         
     Example:
         >>> info = get_file_info(drive, "abc123")
-        >>> print(info['title'], info['size'])
+        >>> print(info['title'], info['fileSize'])
     """
     gfile = drive.CreateFile({'id': file_id})
     gfile.FetchMetadata()
     
-    return dict(gfile)
+    info = dict(gfile)
+    
+    if show_path:
+        print(f"📄 File: {info['title']}")
+        print(f"   ID: {file_id}")
+        print(f"   View URL: https://drive.google.com/file/d/{file_id}/view")
+        
+        # Get and show path
+        if 'parents' in info and len(info['parents']) > 0:
+            parent_id = info['parents'][0]['id']
+            path = get_file_path(drive, file_id)
+            print(f"   Path: {path}")
+            print(f"   Folder URL: https://drive.google.com/drive/folders/{parent_id}")
+        else:
+            print(f"   Path: My Drive/")
+        
+        if 'fileSize' in info:
+            size_mb = int(info['fileSize']) / (1024 * 1024)
+            print(f"   Size: {size_mb:.2f} MB")
+    
+    return info
+
+
+def get_file_path(
+    drive: GoogleDrive,
+    file_id: str
+) -> str:
+    """
+    Get the full path of a file in Google Drive.
+    Lấy đường dẫn đầy đủ của file trên Google Drive.
+    
+    Args:
+        drive: Authenticated GoogleDrive instance
+        file_id: ID of the file
+    
+    Returns:
+        str: Full path from My Drive (e.g., "My Drive/Folder1/Folder2/file.txt")
+        
+    Example:
+        >>> path = get_file_path(drive, "abc123")
+        >>> print(f"File located at: {path}")
+    """
+    gfile = drive.CreateFile({'id': file_id})
+    gfile.FetchMetadata()
+    
+    # Build path from root to file
+    path_parts = [gfile['title']]
+    
+    # Traverse parent folders
+    current = gfile
+    max_depth = 100  # Prevent infinite loop
+    depth = 0
+    
+    while 'parents' in current and len(current['parents']) > 0 and depth < max_depth:
+        parent_id = current['parents'][0]['id']
+        
+        # Stop at root
+        if parent_id == 'root' or not parent_id:
+            break
+        
+        # Get parent folder
+        try:
+            parent = drive.CreateFile({'id': parent_id})
+            parent.FetchMetadata()
+            path_parts.insert(0, parent['title'])
+            current = parent
+            depth += 1
+        except:
+            break
+    
+    # Build full path
+    full_path = "My Drive/" + "/".join(path_parts)
+    return full_path
 
 
 def list_files_in_folder(

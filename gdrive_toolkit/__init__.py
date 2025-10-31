@@ -28,6 +28,7 @@ from .operations import (
     search_files,
     delete_file,
     get_file_info,
+    get_file_path,
     list_files_in_folder,
 )
 
