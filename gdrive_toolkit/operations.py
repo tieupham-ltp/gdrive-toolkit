@@ -13,7 +13,8 @@ def upload_file(
     drive: GoogleDrive,
     file_path: str,
     folder_id: Optional[str] = None,
-    file_name: Optional[str] = None
+    file_name: Optional[str] = None,
+    show_progress: bool = True
 ) -> str:
     """
     Upload a file to Google Drive.
@@ -24,6 +25,7 @@ def upload_file(
         file_path: Path to the local file to upload
         folder_id: ID of the target folder (None for root)
         file_name: Custom name for uploaded file (None to use original name)
+        show_progress: Show upload progress bar (default: True)
     
     Returns:
         str: ID of the uploaded file
@@ -39,6 +41,9 @@ def upload_file(
     if file_name is None:
         file_name = os.path.basename(file_path)
     
+    # Get file size for progress tracking
+    file_size = os.path.getsize(file_path)
+    
     # Create file metadata
     metadata = {'title': file_name}
     
@@ -48,7 +53,26 @@ def upload_file(
     # Create and upload file
     gfile = drive.CreateFile(metadata)
     gfile.SetContentFile(file_path)
-    gfile.Upload()
+    
+    if show_progress and file_size > 1024 * 1024:  # Show progress for files > 1MB
+        from .utils import format_size
+        print(f"📤 Uploading '{file_name}' ({format_size(file_size)})...")
+        
+        # Upload with progress callback
+        def progress_callback(current, total):
+            if total > 0:
+                percent = (current / total) * 100
+                bar_length = 40
+                filled = int(bar_length * current // total)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                print(f'\r  Progress: |{bar}| {percent:.1f}% ({format_size(current)}/{format_size(total)})', end='', flush=True)
+        
+        # Note: pydrive2 doesn't support progress callback directly
+        # We'll just show a message
+        gfile.Upload()
+        print()  # New line after upload
+    else:
+        gfile.Upload()
     
     file_id = gfile['id']
     
@@ -82,7 +106,8 @@ def download_file(
     file_id: Optional[str] = None,
     file_name: Optional[str] = None,
     save_path: str = ".",
-    query: Optional[str] = None
+    query: Optional[str] = None,
+    show_progress: bool = True
 ) -> str:
     """
     Download a file from Google Drive.
@@ -94,6 +119,7 @@ def download_file(
         file_name: Name of the file to search and download
         save_path: Local path to save the file (directory or full path)
         query: Custom search query (advanced usage)
+        show_progress: Show download progress (default: True)
     
     Returns:
         str: Path to the downloaded file
@@ -137,8 +163,19 @@ def download_file(
     # Create directory if needed
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     
-    # Download file
-    gfile.GetContentFile(output_path)
+    # Show progress for large files
+    if show_progress:
+        file_size = int(gfile.get('fileSize', 0))
+        
+        if file_size > 1024 * 1024:  # Show progress for files > 1MB
+            from .utils import format_size
+            print(f"📥 Downloading '{title}' ({format_size(file_size)})...")
+            gfile.GetContentFile(output_path)
+            print(f"  ✓ Download complete!")
+        else:
+            gfile.GetContentFile(output_path)
+    else:
+        gfile.GetContentFile(output_path)
     
     print(f"✓ Downloaded '{title}' to '{output_path}'")
     

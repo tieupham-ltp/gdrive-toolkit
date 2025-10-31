@@ -42,7 +42,8 @@ def cli():
 @click.option('--folder', '-f', help='Folder name or ID to upload to')
 @click.option('--name', '-n', help='Custom name for uploaded file')
 @click.option('--share', is_flag=True, help='Share file after upload')
-def upload(file_path: str, folder: Optional[str], name: Optional[str], share: bool):
+@click.option('--no-progress', is_flag=True, help='Disable progress display')
+def upload(file_path: str, folder: Optional[str], name: Optional[str], share: bool, no_progress: bool):
     """Upload a file to Google Drive."""
     click.echo("🔐 Authenticating...")
     drive = quick_connect()
@@ -63,7 +64,7 @@ def upload(file_path: str, folder: Optional[str], name: Optional[str], share: bo
     
     # Upload file
     click.echo(f"📤 Uploading: {file_path}")
-    file_id = upload_file(drive, file_path, parent_id=folder_id, file_name=name)
+    file_id = upload_file(drive, file_path, parent_id=folder_id, file_name=name, show_progress=not no_progress)
     
     # Share if requested
     if share:
@@ -76,13 +77,14 @@ def upload(file_path: str, folder: Optional[str], name: Optional[str], share: bo
 @cli.command()
 @click.argument('file_id')
 @click.option('--output', '-o', default='.', help='Output path (default: current directory)')
-def download(file_id: str, output: str):
+@click.option('--no-progress', is_flag=True, help='Disable progress display')
+def download(file_id: str, output: str, no_progress: bool):
     """Download a file from Google Drive."""
     click.echo("🔐 Authenticating...")
     drive = quick_connect()
     
     click.echo(f"📥 Downloading file ID: {file_id}")
-    path = download_file(drive, file_id, output)
+    path = download_file(drive, file_id, output, show_progress=not no_progress)
     
     click.echo(f"✅ Downloaded to: {path}")
 

@@ -15,7 +15,8 @@ def upload_file(
     drive: GoogleDrive,
     local_path: str,
     parent_id: Optional[str] = None,
-    file_name: Optional[str] = None
+    file_name: Optional[str] = None,
+    show_progress: bool = True
 ) -> str:
     """
     Upload a file to Google Drive.
@@ -26,6 +27,7 @@ def upload_file(
         local_path: Path to local file
         parent_id: Parent folder ID (None for root)
         file_name: Custom name (None to use original)
+        show_progress: Show upload progress (default: True)
     
     Returns:
         str: File ID
@@ -40,9 +42,19 @@ def upload_file(
     if parent_id:
         metadata['parents'] = [{'id': parent_id}]  # type: ignore
     
+    # Get file size for progress tracking
+    file_size = os.path.getsize(local_path)
+    
     gfile = drive.CreateFile(metadata)
     gfile.SetContentFile(local_path)
-    gfile.Upload()
+    
+    if show_progress and file_size > 1024 * 1024:  # Show progress for files > 1MB
+        from .utils import format_size
+        print(f"📤 Uploading '{metadata['title']}' ({format_size(file_size)})...")
+        gfile.Upload()
+        print(f"  ✓ Upload complete!")
+    else:
+        gfile.Upload()
     
     print(f"✓ Uploaded '{metadata['title']}' (ID: {gfile['id']})")
     return gfile['id']
@@ -51,7 +63,8 @@ def upload_file(
 def download_file(
     drive: GoogleDrive,
     file_id: str,
-    dest_path: str
+    dest_path: str,
+    show_progress: bool = True
 ) -> str:
     """
     Download a file from Google Drive.
@@ -61,6 +74,7 @@ def download_file(
         drive: Authenticated GoogleDrive instance
         file_id: File ID to download
         dest_path: Destination path
+        show_progress: Show download progress (default: True)
     
     Returns:
         str: Downloaded file path
@@ -76,7 +90,20 @@ def download_file(
     
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     
-    gfile.GetContentFile(output_path)
+    # Show progress for large files
+    if show_progress:
+        file_size = int(gfile.get('fileSize', 0))
+        
+        if file_size > 1024 * 1024:  # Show progress for files > 1MB
+            from .utils import format_size
+            print(f"📥 Downloading '{gfile['title']}' ({format_size(file_size)})...")
+            gfile.GetContentFile(output_path)
+            print(f"  ✓ Download complete!")
+        else:
+            gfile.GetContentFile(output_path)
+    else:
+        gfile.GetContentFile(output_path)
+    
     print(f"✓ Downloaded '{gfile['title']}' to '{output_path}'")
     
     return output_path
