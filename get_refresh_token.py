@@ -25,9 +25,21 @@ def get_refresh_token():
     try:
         with open('client_secrets.json', 'r') as f:
             secrets = json.load(f)
-            client_id = secrets['installed']['client_id']
-            client_secret = secrets['installed']['client_secret']
+            
+            # Support both 'installed' (Desktop app) and 'web' (Web app)
+            if 'installed' in secrets:
+                client_id = secrets['installed']['client_id']
+                client_secret = secrets['installed']['client_secret']
+                app_type = 'Desktop app'
+            elif 'web' in secrets:
+                client_id = secrets['web']['client_id']
+                client_secret = secrets['web']['client_secret']
+                app_type = 'Web app'
+            else:
+                raise ValueError("Invalid client_secrets.json format")
+            
             print("✓ Found client_secrets.json")
+            print(f"  App type: {app_type}")
             print(f"  Client ID: {client_id[:20]}...")
     except FileNotFoundError:
         print("❌ Error: client_secrets.json not found!")
@@ -48,14 +60,18 @@ def get_refresh_token():
     print("Starting OAuth flow...")
     print()
     
-    # Configure GoogleAuth
-    gauth = GoogleAuth()
-    gauth.settings['client_config_backend'] = 'file'
-    gauth.settings['client_config_file'] = 'client_secrets.json'
-    gauth.settings['save_credentials'] = True
-    gauth.settings['save_credentials_backend'] = 'file'
-    gauth.settings['save_credentials_file'] = 'credentials_temp.json'
-    gauth.settings['oauth_scope'] = ['https://www.googleapis.com/auth/drive']
+    # Configure GoogleAuth with proper settings dict
+    settings = {
+        "client_config_backend": "file",
+        "client_config_file": "client_secrets.json",
+        "save_credentials": True,
+        "save_credentials_backend": "file",
+        "save_credentials_file": "credentials_temp.json",
+        "get_refresh_token": True,
+        "oauth_scope": ["https://www.googleapis.com/auth/drive"]
+    }
+    
+    gauth = GoogleAuth(settings=settings)
     
     try:
         # Start local webserver authentication

@@ -149,7 +149,27 @@ def authenticate_kaggle(
     # Method 1: Try refresh token if provided
     if refresh_token:
         try:
-            gauth.Auth(refresh_token)
+            from oauth2client.client import OAuth2Credentials
+            
+            # Create credentials from refresh token
+            credentials = OAuth2Credentials(
+                access_token=None,
+                client_id=client_id,
+                client_secret=client_secret,
+                refresh_token=refresh_token,
+                token_expiry=None,
+                token_uri="https://oauth2.googleapis.com/token",
+                user_agent=None
+            )
+            
+            gauth.credentials = credentials
+            
+            # Refresh to get access token
+            if gauth.access_token_expired:
+                gauth.Refresh()
+            else:
+                gauth.Authorize()
+            
             drive = GoogleDrive(gauth)
             print("✓ Successfully authenticated in Kaggle (using refresh token)")
             return drive
