@@ -325,7 +325,10 @@ def quick_connect(
     credentials_file: str = "mycreds.txt",
     client_secrets_file: str = "client_secrets.json",
     force_env: Optional[str] = None,
-    kaggle_credentials_txt: Optional[str] = None
+    kaggle_credentials_txt: Optional[str] = None,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
+    refresh_token: Optional[str] = None
 ) -> GoogleDrive:
     """
     Quick connect to Google Drive with auto-detection of environment.
@@ -341,6 +344,9 @@ def quick_connect(
                    If None, auto-detects. Use this if auto-detection fails.
         kaggle_credentials_txt: Path to text file with Kaggle credentials (Kaggle only, optional)
                                 Format: GDRIVE_CLIENT_ID: xxx\nGDRIVE_CLIENT_SECRET: xxx\nGDRIVE_REFRESH_TOKEN: xxx
+        client_id: Google OAuth client ID (Kaggle only, optional)
+        client_secret: Google OAuth client secret (Kaggle only, optional)
+        refresh_token: Google OAuth refresh token (Kaggle only, optional)
     
     Returns:
         GoogleDrive: Authenticated Google Drive instance
@@ -348,6 +354,13 @@ def quick_connect(
     Examples:
         >>> # Auto-detect environment
         >>> drive = quick_connect()
+        
+        >>> # Kaggle: Pass credentials directly
+        >>> drive = quick_connect(
+        ...     client_id='your_client_id',
+        ...     client_secret='your_client_secret',
+        ...     refresh_token='your_refresh_token'
+        ... )
         
         >>> # Kaggle: Use text file with credentials
         >>> drive = quick_connect(kaggle_credentials_txt='kaggle_secrets.txt')
@@ -376,7 +389,12 @@ def quick_connect(
     if env == 'colab':
         return authenticate_colab()
     elif env == 'kaggle':
-        return authenticate_kaggle(credentials_txt=kaggle_credentials_txt)
+        return authenticate_kaggle(
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=refresh_token,
+            credentials_txt=kaggle_credentials_txt
+        )
     else:  # local
         return authenticate_local(credentials_file, client_secrets_file)
 
