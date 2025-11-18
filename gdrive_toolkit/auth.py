@@ -65,37 +65,75 @@ def authenticate_colab() -> GoogleDrive:
 def authenticate_kaggle(
     client_id: Optional[str] = None,
     client_secret: Optional[str] = None,
-    refresh_token: Optional[str] = None
+    refresh_token: Optional[str] = None,
+    credentials_txt: Optional[str] = None
 ) -> GoogleDrive:
     """
     Authenticate Google Drive in Kaggle environment.
     Xác thực trong môi trường Kaggle.
     
     Args:
-        client_id: Google OAuth client ID (optional, reads from secrets if not provided)
-        client_secret: Google OAuth client secret (optional, reads from secrets if not provided)
-        refresh_token: Google OAuth refresh token (optional, reads from secrets if not provided)
+        client_id: Google OAuth client ID (optional, reads from secrets/file if not provided)
+        client_secret: Google OAuth client secret (optional, reads from secrets/file if not provided)
+        refresh_token: Google OAuth refresh token (optional, reads from secrets/file if not provided)
+        credentials_txt: Path to text file with credentials (optional, e.g., 'kaggle_secrets.txt')
     
     Returns:
         GoogleDrive: Authenticated Google Drive instance
         
     Note:
-        Requires Kaggle secrets: GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET
-        Optional (recommended): GDRIVE_REFRESH_TOKEN
+        Priority order:
+        1. Function arguments (client_id, client_secret, refresh_token)
+        2. Text file (credentials_txt)
+        3. Kaggle Secrets (GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN)
         
-        If refresh_token is not provided, will attempt to use saved credentials file.
+        Text file format (one per line):
+            GDRIVE_CLIENT_ID: your_client_id_here
+            GDRIVE_CLIENT_SECRET: your_client_secret_here
+            GDRIVE_REFRESH_TOKEN: your_refresh_token_here
         
     Example:
-        >>> # Option 1: Use Kaggle Secrets (with refresh token)
+        >>> # Option 1: Use Kaggle Secrets
         >>> drive = authenticate_kaggle()
         
-        >>> # Option 2: Provide credentials manually
+        >>> # Option 2: Use text file
+        >>> drive = authenticate_kaggle(credentials_txt='kaggle_secrets.txt')
+        
+        >>> # Option 3: Provide credentials manually
         >>> drive = authenticate_kaggle(
         ...     client_id='your_client_id',
         ...     client_secret='your_client_secret',
         ...     refresh_token='your_refresh_token'
         ... )
     """
+    # Try to load from text file first
+    if credentials_txt and os.path.exists(credentials_txt):
+        print(f"📄 Reading credentials from {credentials_txt}...")
+        try:
+            with open(credentials_txt, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    
+                    # Support both formats: KEY: value and KEY=value
+                    separator = ':' if ':' in line else '='
+                    if separator in line:
+                        key, value = line.split(separator, 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        
+                        if key == 'GDRIVE_CLIENT_ID' and client_id is None:
+                            client_id = value
+                        elif key == 'GDRIVE_CLIENT_SECRET' and client_secret is None:
+                            client_secret = value
+                        elif key == 'GDRIVE_REFRESH_TOKEN' and refresh_token is None:
+                            refresh_token = value
+            
+            print(f"✓ Loaded credentials from {credentials_txt}")
+        except Exception as e:
+            print(f"⚠️ Failed to read {credentials_txt}: {e}")
+    
     # Try to get from arguments first, then from Kaggle secrets
     if client_id is None or client_secret is None:
         try:
@@ -286,7 +324,8 @@ def authenticate_local(
 def quick_connect(
     credentials_file: str = "mycreds.txt",
     client_secrets_file: str = "client_secrets.json",
-    force_env: Optional[str] = None
+    force_env: Optional[str] = None,
+    kaggle_credentials_txt: Optional[str] = None
 ) -> GoogleDrive:
     """
     Quick connect to Google Drive with auto-detection of environment.
@@ -300,6 +339,8 @@ def quick_connect(
         client_secrets_file: Path to client secrets (local only, default: 'client_secrets.json')
         force_env: Force specific environment ('colab', 'kaggle', or 'local'). 
                    If None, auto-detects. Use this if auto-detection fails.
+        kaggle_credentials_txt: Path to text file with Kaggle credentials (Kaggle only, optional)
+                                Format: GDRIVE_CLIENT_ID: xxx\nGDRIVE_CLIENT_SECRET: xxx\nGDRIVE_REFRESH_TOKEN: xxx
     
     Returns:
         GoogleDrive: Authenticated Google Drive instance
@@ -307,6 +348,9 @@ def quick_connect(
     Examples:
         >>> # Auto-detect environment
         >>> drive = quick_connect()
+        
+        >>> # Kaggle: Use text file with credentials
+        >>> drive = quick_connect(kaggle_credentials_txt='kaggle_secrets.txt')
         
         >>> # Force Kaggle authentication (if auto-detect fails)
         >>> drive = quick_connect(force_env='kaggle')
@@ -332,7 +376,7 @@ def quick_connect(
     if env == 'colab':
         return authenticate_colab()
     elif env == 'kaggle':
-        return authenticate_kaggle()
+        return authenticate_kaggle(credentials_txt=kaggle_credentials_txt)
     else:  # local
         return authenticate_local(credentials_file, client_secrets_file)
 
